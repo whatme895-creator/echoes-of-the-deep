@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Echoes of the Deep</title>
+<style>
+:root{--abyss:#02070c;--teal:#0b4a63;--sub:#ffd23f;--relic:#5ef2d6;--warn:#ff6b57;--ink:#d8f3ee}
+html,body{height:100%;margin:0;background:var(--abyss);overflow:hidden;color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI",sans-serif}
+canvas{position:fixed;inset:0;display:block}
+.ov{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(2,7,12,.82);padding:env(safe-area-inset-top,0) 16px env(safe-area-inset-bottom,0)}
+.ov.on{display:flex}
+.card{max-width:460px;width:100%;background:#071a26;border:1px solid #1d5a73;border-radius:10px;padding:26px 28px;box-shadow:0 0 60px rgba(94,242,214,.12)}
+h1{font:600 34px/1.1 "Palatino Linotype",Palatino,Georgia,serif;margin:0 0 10px;color:var(--sub)}
+h2{font:600 26px/1.1 "Palatino Linotype",Palatino,Georgia,serif;margin:0 0 6px;color:var(--sub)}
+p{line-height:1.5;margin:8px 0;font-size:15px}
+.k{display:inline-block;border:1px solid #2c7a96;border-radius:4px;padding:0 6px;font-size:13px;background:#0b2a3a}
+button{font:600 15px system-ui,sans-serif;border:0;border-radius:6px;padding:10px 18px;background:var(--sub);color:#1b1500;cursor:pointer}
+button:focus-visible{outline:3px solid var(--relic);outline-offset:2px}
+button:disabled{background:#26414d;color:#7fa0ad;cursor:default}
+.row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 0;border-top:1px solid #174357}
+.row b{display:block;font-size:15px}.row small{color:#8fb5c2}
+.pips{letter-spacing:3px;color:var(--relic);font-size:12px}
+.coins{font-size:18px;color:var(--relic);margin:0 0 6px}
+</style></head><body>
+<canvas id="c"></canvas>
+<div class="ov on" id="title"><div class="card">
+<h1>Echoes of the Deep</h1>
+<p>Dive from the dock in your yellow sub, light up the caves, and bring back all 12 glowing relics before your air or battery gives out.</p>
+<p><span class="k">Arrows</span> / <span class="k">WASD</span> swim &nbsp; <span class="k">Space</span> sonar ping<br><span class="k">F</span> spotlight on/off &nbsp; <span class="k">E</span> open shop at the dock</p>
+<p>Run out of air and you are rescued, but the relics you carried drift back into the dark.</p>
+<p><button id="go">Start diving</button></p></div></div>
+<div class="ov" id="shop"><div class="card">
+<h2>Dock shop</h2><p class="coins" id="coins"></p><div id="rows"></div>
+<p><button id="dive">Dive</button></p></div></div>
+<div class="ov" id="end"><div class="card"><h2>All relics recovered</h2><p id="endt"></p><p><button onclick="location.reload()">Dive again</button></p></div></div>
+<script>
+(()=>{
+const cv=document.getElementById('c'),g=cv.getContext('2d'),dk=document.createElement('canvas'),d=dk.getContext('2d');
+let W,H;function rs(){W=cv.width=dk.width=innerWidth;H=cv.height=dk.height=innerHeight}addEventListener('resize',rs);rs();
+const TS=40,COLS=72,ROWS=60,SURF=2*TS,DOCKX=COLS*TS/2,NREL=12,WW=COLS*TS,WH=ROWS*TS;
+let seed=20261121;const rnd=()=>(seed=seed*16807%2147483647)/2147483647;
+const grid=[],relics=[],nodes=[];
+for(let r=0;r<ROWS;r++){grid[r]=[];for(let c=0;c<COLS;c++)grid[r][c]=(r>=6||c==0||c==COLS-1)?1:0}
+function carve(cx,cy,rad){for(let r=-rad;r<=rad;r++)for(let c=-rad;c<=rad;c++){const x=cx+c,y=cy+r;if(x>0&&x<COLS-1&&y>=5&&y<ROWS-2)grid[y][x]=0}}
+(function gen(){const mx=COLS>>1;for(let y=5;y<=12;y++)carve(mx,y,1);nodes.push([mx,12]);
+for(let i=0;i<NREL;i++){const tx=4+(rnd()*(COLS-8)|0),ty=14+(rnd()*(ROWS-20)|0);let b=nodes[0],bd=1e9;
+for(const n of nodes){const k=Math.hypot(n[0]-tx,n[1]-ty);if(k<bd){bd=k;b=n}}
+let x=b[0],y=b[1],s=0;while(Math.abs(x-tx)+Math.abs(y-ty)>1&&s<900){s++;
+if(rnd()<.3){if(rnd()<.5)x+=rnd()<.5?1:-1;else y+=rnd()<.5?1:-1}else if(Math.abs(tx-x)>Math.abs(ty-y))x+=Math.sign(tx-x);else y+=Math.sign(ty-y);
+x=Math.max(2,Math.min(COLS-3,x));y=Math.max(6,Math.min(ROWS-4,y));carve(x,y,1);if(s%6==0)nodes.push([x,y])}
+carve(tx,ty,2);nodes.push([tx,ty]);
+relics.push({x:(tx+.5)*TS,y:(ty+.5)*TS,v:15+Math.floor((ty-14)/(ROWS-20)*50)+(rnd()*15|0),hue:150+rnd()*130,got:0,seen:0,ph:rnd()*6})}
+for(let i=0;i<14;i++){const n=nodes[rnd()*nodes.length|0];let x=n[0],y=n[1];for(let k=0;k<60;k++){const q=rnd();if(q<.25)x++;else if(q<.5)x--;else if(q<.75)y++;else y--;x=Math.max(2,Math.min(COLS-3,x));y=Math.max(6,Math.min(ROWS-4,y));carve(x,y,rnd()<.08?2:1)}nodes.push([x,y])}})();
+const wall=(x,y)=>{const c=x/TS|0,r=y/TS|0;return x<0||y<0||c>=COLS||r>=ROWS||grid[r][c]===1};
+const hit=(x,y,q)=>wall(x-q,y-q)||wall(x+q,y-q)||wall(x-q,y+q)||wall(x+q,y+q);
+// state
+let sv={coins:0,ox:0,lt:0,bt:0};try{Object.assign(sv,JSON.parse(localStorage.getItem('eotd')||'{}'))}catch(e){}
+const save=()=>{try{localStorage.setItem('eotd',JSON.stringify(sv))}catch(e){}};
+const maxOx=()=>60+20*sv.ox,maxBat=()=>100+25*sv.bt,range=()=>200+45*sv.lt;
+const s={x:DOCKX,y:SURF,vx:0,vy:0,a:Math.PI/2,dir:1};
+let ox=maxOx(),bat=maxBat(),light=true,carried=[],banked=0,docked=true,state='title',msgT=0,msgS='',ping=null,pcd=0,bt=0,t=0;
+const keys={},parts=[],cam={x:0,y:0};
+const msg=m=>{msgS=m;msgT=3.5};
+// audio
+let ac,mg;
+function au(){if(!ac){try{ac=new(window.AudioContext||window.webkitAudioContext)();mg=ac.createGain();mg.gain.value=.5;mg.connect(ac.destination);
+const o=ac.createOscillator(),gn=ac.createGain(),l=ac.createOscillator(),lg=ac.createGain();o.frequency.value=52;gn.gain.value=.05;l.frequency.value=.12;lg.gain.value=.02;l.connect(lg).connect(gn.gain);o.connect(gn).connect(mg);o.start();l.start()}catch(e){ac=null}}
+if(ac&&ac.state==='suspended')ac.resume()}
+function tone(f,dur,v,type,f2,delay){if(!ac)return;const n=ac.currentTime+(delay||0),o=ac.createOscillator(),gn=ac.createGain();o.type=type||'sine';o.frequency.setValueAtTime(f,n);if(f2)o.frequency.exponentialRampToValueAtTime(f2,n+dur);gn.gain.setValueAtTime(v,n);gn.gain.exponentialRampToValueAtTime(.001,n+dur);o.connect(gn).connect(mg);o.start(n);o.stop(n+dur+.05)}
+const sPing=()=>{tone(1100,1.1,.22,'sine',850);tone(1100,.9,.07,'sine',850,.4);tone(1100,.7,.03,'sine',850,.8)};
+const sBub=()=>{const f=250+Math.random()*350;tone(f,.12,.05,'sine',f*2)};
+const sGet=()=>[660,880,1320].forEach((f,i)=>tone(f,.35,.12,'triangle',0,i*.08));
+const sBuy=()=>{tone(520,.2,.1,'square');tone(780,.25,.1,'square',0,.1)};
+// input
+addEventListener('keydown',e=>{keys[e.code]=1;if(/Arrow|Space/.test(e.code))e.preventDefault();au();
+if(state==='title'&&e.code==='Enter')start();
+else if(state==='play'){if(e.code==='Space')doPing();if(e.code==='KeyF')light=!light;if(e.code==='KeyE'&&docked)openShop()}
+else if(state==='shop'&&(e.code==='Escape'||e.code==='Enter'))closeShop()});
+addEventListener('keyup',e=>keys[e.code]=0);
+const $=id=>document.getElementById(id);
+function start(){au();state='play';$('title').classList.remove('on')}
+$('go').onclick=start;$('dive').onclick=closeShop;
+function doPing(){if(pcd>0||bat<4)return;bat-=4;pcd=1.2;ping={r:0,x:s.x,y:s.y};sPing()}
+const cost=l=>40+l*45,MAXL=6;
+function openShop(){state='shop';renderShop();$('shop').classList.add('on')}
+function closeShop(){state='play';$('shop').classList.remove('on')}
+function renderShop(){$('coins').textContent='Coins: '+sv.coins+'   Relics banked: '+banked+'/'+NREL;
+const items=[['ox','Oxygen tank','+20 s of air per level'],['lt','Spotlight','Longer reach per level'],['bt','Battery','+25 charge per level']];
+$('rows').innerHTML='';items.forEach(([k,n,sub])=>{const lv=sv[k],row=document.createElement('div');row.className='row';
+row.innerHTML='<div><b>'+n+'</b><small>'+sub+'</small><div class="pips">'+'●'.repeat(lv)+'○'.repeat(MAXL-lv)+'</div></div>';
+const b=document.createElement('button');b.textContent=lv>=MAXL?'Maxed':'Buy '+cost(lv);b.disabled=lv>=MAXL||sv.coins<cost(lv);
+b.onclick=()=>{if(sv.coins>=cost(sv[k])&&sv[k]<MAXL){sv.coins-=cost(sv[k]);sv[k]++;save();sBuy();ox=maxOx();bat=maxBat();renderShop()}};row.appendChild(b);$('rows').appendChild(row)})}
+// update
+function upd(dt){t+=dt;pcd-=dt;msgT-=dt;
+let ax=(keys.ArrowRight||keys.KeyD?1:0)-(keys.ArrowLeft||keys.KeyA?1:0),ay=(keys.ArrowDown||keys.KeyS?1:0)-(keys.ArrowUp||keys.KeyW?1:0);
+const l=Math.hypot(ax,ay)||1,acc=(bat>0?300:170);s.vx+=ax/l*acc*dt;s.vy+=ay/l*acc*dt;
+const dr=Math.pow(.12,dt);s.vx*=dr;s.vy*=dr;
+let nx=s.x+s.vx*dt;if(hit(nx,s.y,13)){s.vx*=-.25;nx=s.x}s.x=nx;
+let ny=s.y+s.vy*dt;if(hit(s.x,ny,13)){s.vy*=-.25;ny=s.y}s.y=ny;
+if(s.y<SURF){s.y=SURF;if(s.vy<0)s.vy=0}
+const sp=Math.hypot(s.vx,s.vy);if(sp>18){const tg=Math.atan2(s.vy,s.vx);let df=tg-s.a;df=Math.atan2(Math.sin(df),Math.cos(df));s.a+=df*Math.min(1,dt*6);if(Math.abs(s.vx)>8)s.dir=Math.sign(s.vx)}
+// docking
+const near=Math.abs(s.x-DOCKX)<110&&s.y<SURF+24;
+if(near){ox=Math.min(maxOx(),ox+60*dt);bat=Math.min(maxBat(),bat+35*dt)}else if(s.y<SURF+24)ox=Math.min(maxOx(),ox+25*dt);else ox-=dt;
+if(near&&!docked){docked=true;if(carried.length){const sum=carried.reduce((a,r)=>a+r.v,0);sv.coins+=sum;banked+=carried.length;msg('Banked '+carried.length+' relic'+(carried.length>1?'s':'')+' for '+sum+' coins');carried=[];save();
+if(banked>=NREL){state='end';$('endt').textContent='All '+NREL+' relics are safe at the dock. Coins on hand: '+sv.coins+'.';$('end').classList.add('on');return}openShop()}}
+if(!near)docked=false;
+if(light&&bat>0)bat-=1.6*dt;if(sp>30)bat-=.25*dt;if(bat<=0){bat=0;if(light)msg('Battery dead: lights out')}
+if(bat<=0)light=false;
+// relics
+for(const r of relics){if(r.got)continue;if(r.seen>0)r.seen-=dt;if(Math.hypot(r.x-s.x,r.y-s.y)<28){r.got=1;carried.push(r);sGet();msg('Relic recovered (+'+r.v+' coins when banked)')}}
+// ping
+if(ping){ping.r+=430*dt;for(const r of relics)if(!r.got&&Math.abs(Math.hypot(r.x-ping.x,r.y-ping.y)-ping.r)<20)r.seen=4;if(ping.r>560)ping=null}
+// fail
+if(ox<=0){ox=maxOx();bat=maxBat();for(const r of carried)r.got=0;carried=[];Object.assign(s,{x:DOCKX,y:SURF,vx:0,vy:0});docked=true;light=true;msg('Out of air. Rescued, but cargo was lost');}
+// bubbles
+bt-=dt;if(bt<=0){bt=sp>30?.2:.6;parts.push({x:s.x-s.dir*14,y:s.y-8,r:1.5+Math.random()*2.5,v:30+Math.random()*30,ph:Math.random()*6});if(s.y>SURF+30&&Math.random()<.5)sBub()}
+for(let i=parts.length-1;i>=0;i--){const p=parts[i];p.y-=p.v*dt;p.x+=Math.sin(t*3+p.ph)*10*dt;if(p.y<SURF||wall(p.x,p.y))parts.splice(i,1)}
+}
+// render
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+function draw(){
+cam.x=clamp(s.x-W/2,Math.min(0,WW-W),Math.max(0,WW-W));cam.y=clamp(s.y-H/2,Math.min(0,WH-H+60),Math.max(0,WH-H+60));
+const cx=cam.x,cy=cam.y;
+g.fillStyle='#223a5c';g.fillRect(0,0,W,H);
+let gr=g.createLinearGradient(0,SURF-cy,0,WH-cy);gr.addColorStop(0,'#0e5875');gr.addColorStop(.35,'#06222f');gr.addColorStop(1,'#020b14');
+g.fillStyle=gr;g.fillRect(0,SURF-cy,W,H);
+const c0=Math.max(0,cx/TS|0),c1=Math.min(COLS-1,(cx+W)/TS|0),r0=Math.max(0,cy/TS|0),r1=Math.min(ROWS-1,(cy+H)/TS|0);
+const cols=['#15222b','#182730','#121d26','#1b2b33','#101a22'];
+for(let r=r0;r<=r1;r++)for(let c=c0;c<=c1;c++)if(grid[r][c]){g.fillStyle=cols[(r*73+c*151)%5];g.fillRect(c*TS-cx,r*TS-cy,TS+1,TS+1)}
+// water surface + dock
+g.strokeStyle='rgba(180,240,255,.6)';g.lineWidth=2;g.beginPath();for(let x=0;x<=W;x+=12){const y=SURF-cy+Math.sin((x+cx)*.04+t*2)*2;x?g.lineTo(x,y):g.moveTo(x,y)}g.stroke();
+const dx=DOCKX-cx,dy=SURF-cy;g.fillStyle='#6b4a2b';g.fillRect(dx-120,dy-12,240,10);g.fillStyle='#4a321d';for(const o of[-110,-40,40,104])g.fillRect(dx+o,dy-2,6,60);
+g.fillStyle='#8a6a40';g.fillRect(dx+70,dy-60,6,48);g.fillStyle='#ffe28a';g.beginPath();g.arc(dx+73,dy-64,6,0,7);g.fill();
+g.fillStyle='#ffd23f';g.font='600 13px system-ui';g.textAlign='center';g.fillText('DOCK',dx,dy-20);
+// relics
+for(const r of relics){if(r.got)continue;const p=.6+.4*Math.sin(t*3+r.ph),x=r.x-cx,y=r.y-cy;
+const rg=g.createRadialGradient(x,y,0,x,y,40);rg.addColorStop(0,'hsla('+r.hue+',90%,65%,'+(.7*p)+')');rg.addColorStop(1,'hsla('+r.hue+',90%,60%,0)');g.fillStyle=rg;g.fillRect(x-40,y-40,80,80);
+g.fillStyle='hsl('+r.hue+',90%,75%)';g.beginPath();g.moveTo(x,y-11);g.lineTo(x+8,y);g.lineTo(x,y+11);g.lineTo(x-8,y);g.fill()}
+g.fillStyle='rgba(200,240,255,.35)';for(const p of parts){g.beginPath();g.arc(p.x-cx,p.y-cy,p.r,0,7);g.fill()}
+// darkness
+const sx=s.x-cx,sy=s.y-cy;d.globalCompositeOperation='source-over';d.fillStyle='rgba(1,5,10,.975)';d.fillRect(0,0,W,H);d.globalCompositeOperation='destination-out';
+gr=d.createLinearGradient(0,-cy,0,-cy+SURF+TS*4);gr.addColorStop(0,'rgba(0,0,0,1)');gr.addColorStop(1,'rgba(0,0,0,0)');d.fillStyle=gr;d.fillRect(0,0,W,H);
+gr=d.createRadialGradient(sx,sy,0,sx,sy,90);gr.addColorStop(0,'rgba(0,0,0,.6)');gr.addColorStop(1,'rgba(0,0,0,0)');d.fillStyle=gr;d.fillRect(sx-90,sy-90,180,180);
+if(light&&bat>0){const R=range();for(const[w,al]of[[.75,.3],[.42,1]]){gr=d.createRadialGradient(sx,sy,10,sx,sy,R);gr.addColorStop(0,'rgba(0,0,0,'+al+')');gr.addColorStop(.7,'rgba(0,0,0,'+al*.7+')');gr.addColorStop(1,'rgba(0,0,0,0)');d.fillStyle=gr;d.beginPath();d.moveTo(sx,sy);d.arc(sx,sy,R,s.a-w,s.a+w);d.closePath();d.fill()}}
+g.drawImage(dk,0,0);
+// sonar
+if(ping){const px=ping.x-cx,py=ping.y-cy,al=1-ping.r/560;g.strokeStyle='rgba(94,242,214,'+al*.7+')';g.lineWidth=2;g.beginPath();g.arc(px,py,ping.r,0,7);g.stroke();
+for(let r=r0;r<=r1;r++)for(let c=c0;c<=c1;c++){if(!grid[r][c])continue;if(!(r>0&&!grid[r-1][c]||r<ROWS-1&&!grid[r+1][c]||c>0&&!grid[r][c-1]||c<COLS-1&&!grid[r][c+1]))continue;
+const q=Math.abs(Math.hypot((c+.5)*TS-ping.x,(r+.5)*TS-ping.y)-ping.r);if(q<26){g.fillStyle='rgba(94,242,214,'+al*(1-q/26)+')';g.fillRect(c*TS-cx,r*TS-cy,TS,TS)}}}
+// relic hints
+for(const r of relics){if(r.got)continue;const x=r.x-cx,y=r.y-cy,dd=Math.hypot(r.x-s.x,r.y-s.y);
+if(r.seen>0){g.strokeStyle='hsla('+r.hue+',90%,70%,'+Math.min(1,r.seen)+')';g.lineWidth=2;g.beginPath();g.arc(x,y,12+3*Math.sin(t*6),0,7);g.stroke()}
+else if(dd<320){g.fillStyle='hsla('+r.hue+',90%,75%,'+(.55*(1-dd/320)*(.5+.5*Math.sin(t*5+r.ph)))+')';g.beginPath();g.arc(x,y,3,0,7);g.fill()}}
+// sub
+g.save();g.translate(sx,sy);g.scale(s.dir,1);g.rotate(clamp(s.vy*.003,-.3,.3));
+g.fillStyle='#ffd23f';g.beginPath();g.ellipse(0,0,17,10,0,0,7);g.fill();g.fillRect(-4,-15,9,8);g.fillRect(2,-17,7,3);
+g.fillStyle='#e0a91a';g.fillRect(-17,-3,5,6);g.save();g.translate(-19,0);g.rotate(t*18);g.fillRect(-1,-7,2,14);g.restore();
+g.fillStyle='#143a4d';g.beginPath();g.arc(7,-1,4,0,7);g.fill();g.fillStyle='rgba(255,255,255,.5)';g.fillRect(5,-3,2,2);
+if(light&&bat>0){g.fillStyle='#fff6c0';g.beginPath();g.arc(16,2,2.5,0,7);g.fill()}g.restore();
+hud()}
+function bar(x,y,w,v,m,col,lbl){g.fillStyle='rgba(2,10,16,.7)';g.fillRect(x,y,w,14);g.fillStyle=v/m<.25&&Math.sin(t*10)>0?'#ff6b57':col;g.fillRect(x+2,y+2,(w-4)*Math.max(0,v/m),10);g.fillStyle='#d8f3ee';g.font='12px system-ui';g.textAlign='left';g.fillText(lbl,x+w+8,y+11)}
+function hud(){const x=14+0,y=14;bar(x,y,170,ox,maxOx(),'#4cc9f0','Oxygen '+Math.ceil(ox)+'s');bar(x,y+22,170,bat,maxBat(),'#ffd23f','Battery');
+g.fillStyle='#d8f3ee';g.font='13px system-ui';g.fillText('Depth '+Math.max(0,Math.round((s.y-SURF)/10))+' m   Carrying '+carried.length+'   Banked '+banked+'/'+NREL+'   Coins '+sv.coins,x,y+58);
+g.fillStyle='#8fb5c2';g.font='12px system-ui';g.fillText('Space: ping   F: light'+(docked?'   E: shop':''),x,y+76);
+if(msgT>0){g.globalAlpha=Math.min(1,msgT);g.fillStyle='#5ef2d6';g.font='600 16px system-ui';g.textAlign='center';g.fillText(msgS,W/2,70);g.globalAlpha=1;g.textAlign='left'}}
+let last=performance.now();
+function loop(n){const dt=Math.min(.05,(n-last)/1000);last=n;if(state==='play')upd(dt);draw();requestAnimationFrame(loop)}
+requestAnimationFrame(loop);
+})();
+</script></body></html>
